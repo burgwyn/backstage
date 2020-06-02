@@ -36,6 +36,17 @@ export class DatabaseManager {
     return new CommonDatabase(knex, logger);
   }
 
+  public static async createTestDatabase(
+    knex: Knex,
+    logger: Logger,
+  ): Promise<Database> {
+    await knex.migrate.latest({
+      directory: path.resolve(__dirname, 'migrations'),
+      loadExtensions: ['.js'],
+    }).then(() => knex.seed.run());
+    return new CommonDatabase(knex, logger);
+  }
+
   private static async logUpdateSuccess(
     database: Database,
     locationId: string,

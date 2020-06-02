@@ -16,8 +16,11 @@
 
 import { Server } from 'http';
 import { Logger } from 'winston';
-import { StaticEntitiesCatalog } from '../catalog';
+import knex from 'knex';
 import { createStandaloneApplication } from './standaloneApplication';
+import { DatabaseEntitiesCatalog } from '../catalog/DatabaseEntitiesCatalog';
+import { DatabaseManager } from '../database/DatabaseManager';
+
 
 export interface ServerOptions {
   port: number;
@@ -29,21 +32,19 @@ export async function startStandaloneServer(
   options: ServerOptions,
 ): Promise<Server> {
   const logger = options.logger.child({ service: 'catalog-backend' });
+  
+  const database = knex({
+    client: 'sqlite3',
+    connection: ':memory:',
+    useNullAsDefault: true,
+  });
+  database.client.pool.on('createSuccess', (_eventId: any, resource: any) => {
+    resource.run('PRAGMA foreign_keys = ON', () => {});
+  });
 
-  const entitiesCatalog = new StaticEntitiesCatalog([
-    {
-      apiVersion: 'backstage.io/v1beta1',
-      kind: 'Component',
-      metadata: { name: 'c1' },
-      spec: { type: 'service' },
-    },
-    {
-      apiVersion: 'backstage.io/v1beta1',
-      kind: 'Component',
-      metadata: { name: 'c2' },
-      spec: { type: 'service' },
-    },
-  ]);
+  const db = await DatabaseManager.createTestDatabase(database, logger);
+
+  const entitiesCatalog = new DatabaseEntitiesCatalog(db);
 
   logger.debug('Creating application...');
   const app = await createStandaloneApplication({
